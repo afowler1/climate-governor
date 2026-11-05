@@ -79,7 +79,8 @@
             "overnight_window_end": "Window end",
             "overnight_start_margin": "Start margin",
             "overnight_stop_margin": "Stop margin",
-            "overnight_overdrive": "Overdrive"
+            "overnight_overdrive": "Overdrive",
+            "overnight_allow_heat": "Allow heating in this profile"
           }
         },
         "solar": {
@@ -92,6 +93,7 @@
             "solar_start_margin": "Start margin",
             "solar_stop_margin": "Stop margin",
             "solar_overdrive": "Overdrive",
+            "solar_allow_heat": "Allow heating in this profile",
             "solar_target_offset": "Target offset",
             "solar_est_load_w": "Estimated power draw (W)",
             "solar_priority": "Priority"

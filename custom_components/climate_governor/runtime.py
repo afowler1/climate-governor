@@ -33,6 +33,7 @@ from .const import (
     CONF_MIN_ON,
     CONF_MIN_SET,
     CONF_OVERDRIVE,
+    CONF_PROFILE_HEAT,
     CONF_PRIORITY,
     CONF_RESERVE_W,
     CONF_SLEEP_TIMER,
@@ -115,6 +116,7 @@ def _profile(data: Mapping[str, Any], name: str, requires_solar: bool) -> Profil
         window_start=_parse_time(data.get(key(CONF_WINDOW_START))),
         window_end=_parse_time(data.get(key(CONF_WINDOW_END))),
         requires_solar=requires_solar,
+        allow_heat=bool(data.get(key(CONF_PROFILE_HEAT), True)),
     )
 
 
@@ -375,7 +377,11 @@ class RoomRunner:
             "next_start": next_start,
             "solar_allowed": bool(self.has_solar and self.hub.allowed(self.room_id)),
             "bands": {
-                p.name: {**band(p, self.target), "window": profile_window(p)}
+                p.name: {
+                    **band(p, self.target),
+                    "window": profile_window(p),
+                    "summary": band_summary(self.settings, p, self.target),
+                }
                 for p in self.settings.profiles
             },
         }

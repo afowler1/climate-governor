@@ -46,6 +46,7 @@ CONF_START_MARGIN = "start_margin"
 CONF_STOP_MARGIN = "stop_margin"
 CONF_OVERDRIVE = "overdrive"
 CONF_TARGET_OFFSET = "target_offset"
+CONF_PROFILE_HEAT = "allow_heat"
 CONF_EST_LOAD_W = "est_load_w"
 CONF_PRIORITY = "priority"
 

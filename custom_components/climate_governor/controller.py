@@ -64,6 +64,8 @@ class Profile:
     window_start: time | None = None
     window_end: time | None = None
     requires_solar: bool = False
+    allow_heat: bool = True
+    allow_cool: bool = True
 
     def gate_open(self, now: time, solar_ok: bool) -> bool:
         """Return True if this profile applies right now."""
@@ -189,9 +191,9 @@ def decide(settings: RoomSettings, inputs: Inputs) -> Decision:
         return Decision(ActionKind.NONE, R_COOLING, profile.name)
 
     if inputs.unit_mode == HvacMode.OFF:
-        if settings.allow_heat and current <= target - profile.start_margin:
+        if settings.allow_heat and profile.allow_heat and current <= target - profile.start_margin:
             return _start(settings, inputs, profile, target, HvacMode.HEAT)
-        if settings.allow_cool and current >= target + profile.start_margin:
+        if settings.allow_cool and profile.allow_cool and current >= target + profile.start_margin:
             return _start(settings, inputs, profile, target, HvacMode.COOL)
         return Decision(ActionKind.NONE, R_IN_BAND, profile.name)
 
@@ -218,9 +220,9 @@ def band_summary(settings: RoomSettings, profile: Profile, target: float) -> str
     """Return a short human description of when the unit will start."""
     points = band(profile, target)
     parts = []
-    if settings.allow_cool:
+    if settings.allow_cool and profile.allow_cool:
         parts.append(f"cool \u2265{fmt(points['cool_above'])}\u00b0")
-    if settings.allow_heat:
+    if settings.allow_heat and profile.allow_heat:
         parts.append(f"heat \u2264{fmt(points['heat_below'])}\u00b0")
     return " \u00b7 ".join(parts)
 

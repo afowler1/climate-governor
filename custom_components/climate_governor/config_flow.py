@@ -42,6 +42,7 @@ from .const import (
     CONF_MIN_SET,
     CONF_NAME,
     CONF_OVERDRIVE,
+    CONF_PROFILE_HEAT,
     CONF_PRIORITY,
     CONF_RESERVE_W,
     CONF_SLEEP_TIMER,
@@ -158,6 +159,7 @@ class RoomSubentryFlow(ConfigSubentryFlow):
             self._key(vol.Required, k(CONF_START_MARGIN), defaults[CONF_START_MARGIN]): _box(0, 15, 0.5, "°"),
             self._key(vol.Required, k(CONF_STOP_MARGIN), defaults[CONF_STOP_MARGIN]): _box(-5, 15, 0.5, "°"),
             self._key(vol.Required, k(CONF_OVERDRIVE), defaults[CONF_OVERDRIVE]): _box(0, 10, 0.5, "°"),
+            self._key(vol.Required, k(CONF_PROFILE_HEAT), defaults[CONF_PROFILE_HEAT]): BooleanSelector(),
         }
         if solar:
             fields[self._key(vol.Required, k(CONF_TARGET_OFFSET), defaults[CONF_TARGET_OFFSET])] = _box(-10, 10, 0.5, "°")
@@ -228,6 +230,7 @@ class RoomSubentryFlow(ConfigSubentryFlow):
             CONF_START_MARGIN: 5,
             CONF_STOP_MARGIN: 0,
             CONF_OVERDRIVE: 2,
+            CONF_PROFILE_HEAT: True,
         }
         return self.async_show_form(
             step_id="overnight",
@@ -248,6 +251,7 @@ class RoomSubentryFlow(ConfigSubentryFlow):
             CONF_START_MARGIN: 1,
             CONF_STOP_MARGIN: 0.5,
             CONF_OVERDRIVE: 0,
+            CONF_PROFILE_HEAT: False,
             CONF_TARGET_OFFSET: -1,
             CONF_EST_LOAD_W: 1500,
             CONF_PRIORITY: 1,

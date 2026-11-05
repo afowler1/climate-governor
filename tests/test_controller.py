@@ -106,6 +106,12 @@ def test_respects_allowed_modes() -> None:
     assert decide(settings(allow_cool=False), inputs(current=32)).kind is ActionKind.NONE
 
 
+def test_profile_can_forbid_heating() -> None:
+    cool_only = Profile(name="solar", start_margin=2, stop_margin=0, allow_heat=False)
+    assert decide(settings(cool_only), inputs(current=20)).kind is ActionKind.NONE
+    assert decide(settings(cool_only), inputs(current=32)).mode is HvacMode.COOL
+
+
 def test_heating_stops_at_target() -> None:
     running = inputs(current=26, unit_mode="heat")
     assert decide(settings(), running).kind is ActionKind.STOP
