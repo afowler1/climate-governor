@@ -66,15 +66,15 @@ from .const import (
 
 
 def _box(low: float, high: float, step: float, unit: str | None = None) -> NumberSelector:
-    return NumberSelector(
-        NumberSelectorConfig(
-            min=low,
-            max=high,
-            step=step,
-            mode=NumberSelectorMode.BOX,
-            unit_of_measurement=unit,
-        )
-    )
+    config: dict[str, Any] = {
+        "min": low,
+        "max": high,
+        "step": step,
+        "mode": NumberSelectorMode.BOX,
+    }
+    if unit:
+        config["unit_of_measurement"] = unit
+    return NumberSelector(NumberSelectorConfig(**config))
 
 
 def _hub_schema(values: dict[str, Any]) -> vol.Schema:
