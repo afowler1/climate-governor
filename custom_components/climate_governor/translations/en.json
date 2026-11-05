@@ -125,6 +125,15 @@
           "cooling": "Cooling",
           "waiting": "Waiting"
         }
+      },
+      "solar_export": {
+        "name": "Solar export"
+      },
+      "solar_budget": {
+        "name": "Solar budget"
+      },
+      "solar_allocated": {
+        "name": "Solar in use"
       }
     }
   }
