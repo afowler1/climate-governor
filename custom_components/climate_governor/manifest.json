@@ -1,0 +1,12 @@
+{
+  "domain": "climate_governor",
+  "name": "Climate Governor",
+  "codeowners": ["@afowler1"],
+  "config_flow": true,
+  "documentation": "https://github.com/afowler1/climate-governor",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/afowler1/climate-governor/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
