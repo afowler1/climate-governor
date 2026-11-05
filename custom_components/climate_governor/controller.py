@@ -99,6 +99,7 @@ class Inputs:
     solar_ok: bool = False
     sleep_active: bool = False
     last_change: datetime | None = None
+    owned: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,7 +168,7 @@ def decide(settings: RoomSettings, inputs: Inputs) -> Decision:
     profile = active_profile(settings, inputs.now.time(), inputs.solar_ok)
 
     if profile is None:
-        if running and settings.stop_when_idle:
+        if running and settings.stop_when_idle and inputs.owned:
             return _stop(settings, inputs, R_OUTSIDE, None)
         return Decision(ActionKind.NONE, R_OUTSIDE)
 

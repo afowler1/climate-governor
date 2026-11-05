@@ -231,6 +231,9 @@ class RoomRunner:
         self.last_error: str | None = None
         self.last_change = None
         self.running_on_solar = False
+        # True once the unit has run under one of our profiles. Only owned
+        # units are stopped when no profile is open, so manual use is left alone.
+        self.owned = False
 
         self._restored: set[str] = set()
         self._started = False
@@ -390,15 +393,22 @@ class RoomRunner:
             solar_ok=self.has_solar and self.hub.allowed(self.room_id),
             sleep_active=sleeping,
             last_change=self.last_change,
+            owned=self.owned,
         )
         decision = decide(self._effective_settings(climate), inputs)
         await self._apply(decision, now)
 
         if decision.kind is ActionKind.START:
+            self.owned = True
             self.running_on_solar = decision.profile == PROFILE_SOLAR
         elif decision.kind is ActionKind.STOP:
+            self.owned = False
             self.running_on_solar = False
         else:
+            if unit_mode not in RUNNING_MODES:
+                self.owned = False
+            elif decision.profile is not None:
+                self.owned = True
             self.running_on_solar = (
                 decision.profile == PROFILE_SOLAR and unit_mode in RUNNING_MODES
             )
