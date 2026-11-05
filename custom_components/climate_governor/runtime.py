@@ -66,7 +66,11 @@ from .controller import (
     Inputs,
     Profile,
     RoomSettings,
+    band,
+    band_summary,
     decide,
+    next_profile,
+    profile_window,
     R_MIN_OFF,
     R_SLEEP,
 )
@@ -137,6 +141,8 @@ class SolarHub:
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
+        self.entry_id = entry.entry_id
+        self._listeners: list[Callable[[], None]] = []
         self.export_sensor: str | None = entry.data.get(CONF_EXPORT_SENSOR) or None
         self.reserve_w = _number(entry.data.get(CONF_RESERVE_W), DEFAULT_RESERVE_W)
         minutes = _number(entry.data.get(CONF_SMOOTHING_MINUTES), DEFAULT_SMOOTHING_MINUTES)
@@ -179,12 +185,44 @@ class SolarHub:
         self._average.add(dt_util.utcnow(), value)
 
     @callback
+    def add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
+        """Register an entity callback. Returns a function that removes it."""
+        self._listeners.append(listener)
+
+        @callback
+        def remove() -> None:
+            if listener in self._listeners:
+                self._listeners.remove(listener)
+
+        return remove
+
+    @callback
+    def _notify(self) -> None:
+        for listener in list(self._listeners):
+            listener()
+
+    @callback
     def _on_change(self, event: Event[EventStateChangedData]) -> None:
         self._sample()
+        self._notify()
 
     @callback
     def _on_tick(self, now: Any) -> None:
         self._sample()
+        self._notify()
+
+    @property
+    def allocated_w(self) -> float:
+        """Estimated draw of the rooms currently running on solar."""
+        return sum(r.est_load_w for r in self.rooms.values() if r.running_on_solar)
+
+    @property
+    def budget_w(self) -> float | None:
+        """Total solar the air conditioners may use: export less reserve plus what they already draw."""
+        average = self.average_export_w
+        if average is None:
+            return None
+        return average - self.reserve_w + self.allocated_w
 
     @property
     def average_export_w(self) -> float | None:
@@ -318,6 +356,29 @@ class RoomRunner:
     @callback
     def _on_state(self, event: Event[EventStateChangedData]) -> None:
         self.hass.async_create_task(self._async_evaluate())
+
+    def band_attributes(self) -> dict[str, Any]:
+        """Describe the band the room is governed by, for dashboards."""
+        now = dt_util.now().time()
+        by_name = {p.name: p for p in self.settings.profiles}
+        shown = by_name.get(self.profile) if self.profile else None
+        next_start = None
+        if shown is None:
+            upcoming = next_profile(self.settings, now)
+            if upcoming:
+                shown, start = upcoming
+                next_start = f"{start:%H:%M}"
+        return {
+            "summary_profile": shown.name if shown else None,
+            "summary": band_summary(self.settings, shown, self.target) if shown else None,
+            "window": profile_window(shown) if shown else None,
+            "next_start": next_start,
+            "solar_allowed": bool(self.has_solar and self.hub.allowed(self.room_id)),
+            "bands": {
+                p.name: {**band(p, self.target), "window": profile_window(p)}
+                for p in self.settings.profiles
+            },
+        }
 
     # -- reading the world -----------------------------------------------
 

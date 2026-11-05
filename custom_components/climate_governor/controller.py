@@ -6,7 +6,7 @@ Nothing in here touches Home Assistant, so it can be unit tested directly.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from enum import StrEnum
 
 UNAVAILABLE_STATES = ("unavailable", "unknown")
@@ -196,3 +196,54 @@ def decide(settings: RoomSettings, inputs: Inputs) -> Decision:
         return Decision(ActionKind.NONE, R_IN_BAND, profile.name)
 
     return Decision(ActionKind.NONE, R_OTHER_MODE, profile.name)
+
+
+def fmt(value: float) -> str:
+    """Format a temperature without a trailing .0."""
+    return f"{value:g}"
+
+
+def band(profile: Profile, target: float) -> dict[str, float]:
+    """Return the trigger and stop points for a profile at a target."""
+    centre = target + profile.target_offset
+    return {
+        "heat_below": centre - profile.start_margin,
+        "cool_above": centre + profile.start_margin,
+        "stop_heat_at": centre + profile.stop_margin,
+        "stop_cool_at": centre - profile.stop_margin,
+    }
+
+
+def band_summary(settings: RoomSettings, profile: Profile, target: float) -> str:
+    """Return a short human description of when the unit will start."""
+    points = band(profile, target)
+    parts = []
+    if settings.allow_cool:
+        parts.append(f"cool \u2265{fmt(points['cool_above'])}\u00b0")
+    if settings.allow_heat:
+        parts.append(f"heat \u2264{fmt(points['heat_below'])}\u00b0")
+    return " \u00b7 ".join(parts)
+
+
+def profile_window(profile: Profile) -> str:
+    """Return a profile's window as text."""
+    if profile.window_start is None or profile.window_end is None:
+        return "all day"
+    return f"{profile.window_start:%H:%M}\u2013{profile.window_end:%H:%M}"
+
+
+def next_profile(settings: RoomSettings, now: time) -> tuple[Profile, time] | None:
+    """Return the profile whose window opens soonest, and when."""
+    best: tuple[float, Profile] | None = None
+    for profile in settings.profiles:
+        if profile.window_start is None:
+            continue
+        wait = (
+            datetime.combine(date.min, profile.window_start)
+            - datetime.combine(date.min, now)
+        ).total_seconds() % 86400
+        if best is None or wait < best[0]:
+            best = (wait, profile)
+    if best is None:
+        return None
+    return best[1], best[1].window_start
