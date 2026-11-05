@@ -118,13 +118,19 @@ def test_cooling_stops_at_target() -> None:
 
 
 def test_stops_when_window_ends() -> None:
-    decision = decide(settings(), inputs(hour=7, unit_mode="cool"))
+    decision = decide(settings(), inputs(hour=7, unit_mode="cool", owned=True))
     assert decision.kind is ActionKind.STOP
     assert decision.reason == "outside_profiles"
 
 
+def test_manual_run_outside_window_is_left_alone() -> None:
+    decision = decide(settings(), inputs(hour=14, unit_mode="cool", owned=False))
+    assert decision.kind is ActionKind.NONE
+    assert decision.reason == "outside_profiles"
+
+
 def test_leaves_unit_alone_outside_window_if_configured() -> None:
-    decision = decide(settings(stop_when_idle=False), inputs(hour=7, unit_mode="cool"))
+    decision = decide(settings(stop_when_idle=False), inputs(hour=7, unit_mode="cool", owned=True))
     assert decision.kind is ActionKind.NONE
 
 
@@ -182,7 +188,7 @@ def test_solar_profile_needs_solar_gate() -> None:
 
 def test_solar_stops_when_gate_closes() -> None:
     cfg = settings(NIGHT, SOLAR)
-    decision = decide(cfg, inputs(hour=12, current=25, unit_mode="cool", solar_ok=False))
+    decision = decide(cfg, inputs(hour=12, current=25, unit_mode="cool", solar_ok=False, owned=True))
     assert decision.kind is ActionKind.STOP
 
 
