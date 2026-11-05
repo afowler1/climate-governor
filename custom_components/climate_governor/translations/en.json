@@ -1,0 +1,131 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Climate Governor",
+        "description": "Solar settings shared by all rooms. Leave the export sensor empty to disable solar profiles.",
+        "data": {
+          "export_sensor": "Grid export power sensor (positive when exporting)",
+          "reserve_w": "Reserve to leave unused (W)",
+          "smoothing_minutes": "Averaging window (minutes)"
+        }
+      },
+      "reconfigure": {
+        "title": "Solar settings",
+        "data": {
+          "export_sensor": "Grid export power sensor (positive when exporting)",
+          "reserve_w": "Reserve to leave unused (W)",
+          "smoothing_minutes": "Averaging window (minutes)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Climate Governor is already set up.",
+      "reconfigure_successful": "Settings updated."
+    }
+  },
+  "config_subentries": {
+    "room": {
+      "initiate_flow": {
+        "user": "Add room",
+        "reconfigure": "Reconfigure room"
+      },
+      "entry_type": "Room",
+      "step": {
+        "user": {
+          "title": "Room",
+          "description": "Fan mode is matched against the unit's own fan modes. Leave the setpoint limits empty to use the unit's limits.",
+          "data": {
+            "name": "Name",
+            "climate_entity": "Climate entity",
+            "temperature_sensor": "Temperature sensor (optional, defaults to the unit's own reading)",
+            "sleep_timer": "Sleep timer (optional, pauses control while active)",
+            "default_target": "Starting target",
+            "allow_heat": "Allow heating",
+            "allow_cool": "Allow cooling",
+            "fan_mode": "Fan mode",
+            "min_set": "Lowest setpoint",
+            "max_set": "Highest setpoint",
+            "min_on_minutes": "Minimum run time (minutes)",
+            "min_off_minutes": "Minimum off time (minutes)",
+            "max_sensor_age_minutes": "Ignore sensor after (minutes, 0 to disable)"
+          }
+        },
+        "reconfigure": {
+          "title": "Room",
+          "description": "Fan mode is matched against the unit's own fan modes. Leave the setpoint limits empty to use the unit's limits.",
+          "data": {
+            "name": "Name",
+            "climate_entity": "Climate entity",
+            "temperature_sensor": "Temperature sensor (optional, defaults to the unit's own reading)",
+            "sleep_timer": "Sleep timer (optional, pauses control while active)",
+            "default_target": "Starting target",
+            "allow_heat": "Allow heating",
+            "allow_cool": "Allow cooling",
+            "fan_mode": "Fan mode",
+            "min_set": "Lowest setpoint",
+            "max_set": "Highest setpoint",
+            "min_on_minutes": "Minimum run time (minutes)",
+            "min_off_minutes": "Minimum off time (minutes)",
+            "max_sensor_age_minutes": "Ignore sensor after (minutes, 0 to disable)"
+          }
+        },
+        "overnight": {
+          "title": "Overnight profile",
+          "description": "Runs inside the time window. Starts when the room drifts this far from the target, and stops once it is back at the target plus the stop margin.",
+          "data": {
+            "overnight_enabled": "Enabled",
+            "overnight_window_start": "Window start",
+            "overnight_window_end": "Window end",
+            "overnight_start_margin": "Start margin",
+            "overnight_stop_margin": "Stop margin",
+            "overnight_overdrive": "Overdrive"
+          }
+        },
+        "solar": {
+          "title": "Solar profile",
+          "description": "Runs inside the time window while there is enough excess solar. The target is shifted by the offset, and rooms share the export in priority order (lowest number first).",
+          "data": {
+            "solar_enabled": "Enabled",
+            "solar_window_start": "Window start",
+            "solar_window_end": "Window end",
+            "solar_start_margin": "Start margin",
+            "solar_stop_margin": "Stop margin",
+            "solar_overdrive": "Overdrive",
+            "solar_target_offset": "Target offset",
+            "solar_est_load_w": "Estimated power draw (W)",
+            "solar_priority": "Priority"
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Room updated."
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "enabled": {
+        "name": "Enabled"
+      }
+    },
+    "number": {
+      "target": {
+        "name": "Target"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "disabled": "Disabled",
+          "sleep": "Sleep timer",
+          "idle": "Idle",
+          "heating": "Heating",
+          "cooling": "Cooling",
+          "waiting": "Waiting"
+        }
+      }
+    }
+  }
+}
