@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.start import async_at_started
 
 from .const import PLATFORMS, SUBENTRY_ROOM
 from .runtime import RoomRunner, SolarHub, async_remove_store
@@ -37,9 +38,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ClimateGovernorConfigEnt
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     await hub.async_start()
-    for runner in rooms.values():
-        await runner.async_start()
 
+    async def _async_start_rooms(_: HomeAssistant) -> None:
+        for runner in rooms.values():
+            await runner.async_start()
+
+    # Wait until Home Assistant has fully started, so the climate entities
+    # and sensors have loaded before any room acts on them.
+    entry.async_on_unload(async_at_started(hass, _async_start_rooms))
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
 

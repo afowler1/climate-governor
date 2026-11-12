@@ -6,7 +6,7 @@ import asyncio
 import dataclasses
 import logging
 from collections.abc import Callable, Mapping
-from datetime import time, timedelta
+from datetime import datetime, time, timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
@@ -161,7 +161,9 @@ class SolarHub:
         self.export_sensor: str | None = entry.data.get(CONF_EXPORT_SENSOR) or None
         self.reserve_w = _number(entry.data.get(CONF_RESERVE_W), DEFAULT_RESERVE_W)
         minutes = _number(entry.data.get(CONF_SMOOTHING_MINUTES), DEFAULT_SMOOTHING_MINUTES)
-        self._average = RollingAverage(timedelta(minutes=minutes))
+        self._window = timedelta(minutes=minutes)
+        self._average = RollingAverage(self._window)
+        self._sampling_since: datetime | None = None
         self.rooms: dict[str, RoomRunner] = {}
         self._unsubs: list[Callable[[], None]] = []
         self._store = _store(hass, entry.entry_id)
@@ -190,6 +192,7 @@ class SolarHub:
         """Begin sampling the export sensor."""
         if not self.export_sensor:
             return
+        self._sampling_since = dt_util.utcnow()
         self._sample()
         self._unsubs.append(
             async_track_state_change_event(self.hass, [self.export_sensor], self._on_change)
@@ -269,17 +272,30 @@ class SolarHub:
         """Return True if the room may run on excess solar right now."""
         if not self.export_sensor:
             return False
-        if self.average_export_w is None:
-            # No export reading yet, e.g. just after a restart. Keep rooms that
-            # were already running on solar going instead of stopping them.
+        average = self.average_export_w
+        if average is None or self.warming_up:
+            # Just after a restart the average holds only a reading or two.
+            # Keep rooms that were already running on solar going until it
+            # covers the full smoothing window.
             room = self.rooms.get(room_id)
-            return bool(room and room.running_on_solar)
+            if room and room.running_on_solar:
+                return True
+            if average is None:
+                return False
         rooms = [
             SolarRoom(r.room_id, r.priority, r.est_load_w, r.running_on_solar)
             for r in self.rooms.values()
             if r.has_solar and r.enabled
         ]
-        return solar_allowed(room_id, rooms, self.average_export_w, self.reserve_w)
+        return solar_allowed(room_id, rooms, average, self.reserve_w)
+
+    @property
+    def warming_up(self) -> bool:
+        """True until export has been sampled for a full smoothing window."""
+        return (
+            self._sampling_since is None
+            or dt_util.utcnow() - self._sampling_since < self._window
+        )
 
 
 class RoomRunner:
