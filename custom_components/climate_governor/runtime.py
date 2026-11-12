@@ -16,9 +16,11 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
 )
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    DOMAIN,
     CONF_ALLOW_COOL,
     CONF_ALLOW_HEAT,
     CONF_CLIMATE,
@@ -83,6 +85,17 @@ UNAVAILABLE = ("unavailable", "unknown")
 RUNNING_MODES = (HvacMode.HEAT.value, HvacMode.COOL.value)
 HA_DEFAULT_MIN_TEMP = 7.0
 HA_DEFAULT_MAX_TEMP = 35.0
+STORAGE_VERSION = 1
+SAVE_DELAY_SECONDS = 5
+
+
+def _store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
+    return Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}")
+
+
+async def async_remove_store(hass: HomeAssistant, entry_id: str) -> None:
+    """Delete the saved room state when the entry is removed."""
+    await _store(hass, entry_id).async_remove()
 
 
 def _number(value: Any, default: float) -> float:
@@ -151,6 +164,27 @@ class SolarHub:
         self._average = RollingAverage(timedelta(minutes=minutes))
         self.rooms: dict[str, RoomRunner] = {}
         self._unsubs: list[Callable[[], None]] = []
+        self._store = _store(hass, entry.entry_id)
+        # Room state saved before the last restart, keyed by room id.
+        self.saved: dict[str, dict[str, Any]] = {}
+
+    async def async_load(self) -> None:
+        """Load the room state saved before the last restart."""
+        data = await self._store.async_load()
+        self.saved = (data or {}).get("rooms", {})
+
+    @callback
+    def schedule_save(self) -> None:
+        """Save room state shortly (also flushed when Home Assistant stops)."""
+        self._store.async_delay_save(self._data_to_save, SAVE_DELAY_SECONDS)
+
+    async def async_save(self) -> None:
+        """Save room state now, e.g. before a reload."""
+        await self._store.async_save(self._data_to_save())
+
+    @callback
+    def _data_to_save(self) -> dict[str, Any]:
+        return {"rooms": {room_id: r.persisted() for room_id, r in self.rooms.items()}}
 
     async def async_start(self) -> None:
         """Begin sampling the export sensor."""
@@ -235,6 +269,11 @@ class SolarHub:
         """Return True if the room may run on excess solar right now."""
         if not self.export_sensor:
             return False
+        if self.average_export_w is None:
+            # No export reading yet, e.g. just after a restart. Keep rooms that
+            # were already running on solar going instead of stopping them.
+            room = self.rooms.get(room_id)
+            return bool(room and room.running_on_solar)
         rooms = [
             SolarRoom(r.room_id, r.priority, r.est_load_w, r.running_on_solar)
             for r in self.rooms.values()
@@ -274,9 +313,14 @@ class RoomRunner:
         # True once the unit has run under one of our profiles. Only owned
         # units are stopped when no profile is open, so manual use is left alone.
         self.owned = False
+        self._load(hub.saved.get(self.room_id))
 
         self._restored: set[str] = set()
         self._started = False
+        # Until the unit has reported in since startup, keep showing the
+        # status restored from before the restart instead of "unavailable".
+        self._unit_seen = False
+        self._status_restored = False
         self._lock = asyncio.Lock()
         self._listeners: list[Callable[[], None]] = []
         self._unsubs: list[Callable[[], None]] = []
@@ -299,6 +343,33 @@ class RoomRunner:
     def _notify(self) -> None:
         for listener in list(self._listeners):
             listener()
+
+    def _load(self, saved: Mapping[str, Any] | None) -> None:
+        """Restore what the room knew before the last restart."""
+        if not saved:
+            return
+        self.owned = bool(saved.get("owned", False))
+        self.running_on_solar = bool(saved.get("running_on_solar", False))
+        last_change = saved.get("last_change")
+        self.last_change = dt_util.parse_datetime(last_change) if last_change else None
+
+    def persisted(self) -> dict[str, Any]:
+        """Return the state that must survive a restart."""
+        return {
+            "owned": self.owned,
+            "running_on_solar": self.running_on_solar,
+            "last_change": self.last_change.isoformat() if self.last_change else None,
+        }
+
+    @callback
+    def restore_status(self, status: str, reason: str | None, profile: str | None) -> None:
+        """Show the last status until the first real evaluation."""
+        if self._started or status == STATUS_DISABLED:
+            return
+        self.status = status
+        self.reason = reason
+        self.profile = profile
+        self._status_restored = True
 
     @callback
     def restore_target(self, value: float | None) -> None:
@@ -435,7 +506,10 @@ class RoomRunner:
         if not self._started or self._restored != {"number", "switch"}:
             return
         async with self._lock:
+            before = self.persisted()
             await self._evaluate()
+            if self.persisted() != before:
+                self.hub.schedule_save()
 
     async def _evaluate(self) -> None:
         if not self.enabled:
@@ -465,7 +539,13 @@ class RoomRunner:
         decision = decide(self._effective_settings(climate), inputs)
         await self._apply(decision, now)
 
-        if decision.kind is ActionKind.START:
+        if unit_mode in UNAVAILABLE:
+            # The unit has not loaded yet or is offline. Keep what we knew
+            # about it rather than forgetting we own it.
+            if not self._unit_seen and self._status_restored:
+                self._notify()
+                return
+        elif decision.kind is ActionKind.START:
             self.owned = True
             self.running_on_solar = decision.profile == PROFILE_SOLAR
         elif decision.kind is ActionKind.STOP:
@@ -479,6 +559,8 @@ class RoomRunner:
             self.running_on_solar = (
                 decision.profile == PROFILE_SOLAR and unit_mode in RUNNING_MODES
             )
+        if unit_mode not in UNAVAILABLE:
+            self._unit_seen = True
 
         self.reason = decision.reason
         self.profile = decision.profile

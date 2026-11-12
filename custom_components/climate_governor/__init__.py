@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import PLATFORMS, SUBENTRY_ROOM
-from .runtime import RoomRunner, SolarHub
+from .runtime import RoomRunner, SolarHub, async_remove_store
 
 
 @dataclass
@@ -25,6 +25,7 @@ type ClimateGovernorConfigEntry = ConfigEntry[GovernorData]
 async def async_setup_entry(hass: HomeAssistant, entry: ClimateGovernorConfigEntry) -> bool:
     """Set up the hub and a runner per room."""
     hub = SolarHub(hass, entry)
+    await hub.async_load()
     rooms = {
         subentry_id: RoomRunner(hass, hub, subentry)
         for subentry_id, subentry in entry.subentries.items()
@@ -49,7 +50,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ClimateGovernorConfigEn
     for runner in data.rooms.values():
         runner.async_stop()
     data.hub.async_stop()
+    await data.hub.async_save()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ClimateGovernorConfigEntry) -> None:
+    """Delete the saved room state."""
+    await async_remove_store(hass, entry.entry_id)
 
 
 async def _async_reload(hass: HomeAssistant, entry: ClimateGovernorConfigEntry) -> None:

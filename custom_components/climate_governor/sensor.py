@@ -80,6 +80,15 @@ class RoomStatusSensor(RoomEntity, SensorEntity):
     def __init__(self, runner: RoomRunner) -> None:
         super().__init__(runner, "status")
 
+    async def async_added_to_hass(self) -> None:
+        """Show the last status until the room is evaluated again."""
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is not None and last.state in STATUSES:
+            self._runner.restore_status(
+                last.state, last.attributes.get("reason"), last.attributes.get("profile")
+            )
+
     @property
     def native_value(self) -> str:
         """Return the current status."""
