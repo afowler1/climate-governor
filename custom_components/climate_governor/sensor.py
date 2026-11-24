@@ -103,6 +103,7 @@ class RoomStatusSensor(RoomEntity, SensorEntity):
             "profile": runner.profile,
             "target": runner.target,
             "last_error": runner.last_error,
+            "temperature_source": runner.temperature_source,
             "export_w": runner.hub.average_export_w,
             **runner.band_attributes(),
         }

@@ -81,6 +81,9 @@ from .solar import RollingAverage, SolarRoom, solar_allowed
 
 _LOGGER = logging.getLogger(__name__)
 
+TEMP_SOURCE_SENSOR = "sensor"
+TEMP_SOURCE_UNIT = "unit"
+
 UNAVAILABLE = ("unavailable", "unknown")
 RUNNING_MODES = (HvacMode.HEAT.value, HvacMode.COOL.value)
 HA_DEFAULT_MIN_TEMP = 7.0
@@ -324,6 +327,8 @@ class RoomRunner:
         self.reason: str | None = None
         self.profile: str | None = None
         self.last_error: str | None = None
+        # Where the last temperature reading came from: sensor, unit or None.
+        self.temperature_source: str | None = None
         self.last_change = None
         self.running_on_solar = False
         # True once the unit has run under one of our profiles. Only owned
@@ -476,20 +481,50 @@ class RoomRunner:
     # -- reading the world -----------------------------------------------
 
     def _temperature(self) -> float | None:
+        """Return the room temperature, preferring the room's own sensor.
+
+        If the sensor is unavailable or stale, fall back to the unit's reading
+        rather than leaving the room uncontrolled.
+        """
         if self.sensor:
-            state = self.hass.states.get(self.sensor)
-            if state is None or state.state in UNAVAILABLE:
+            value = self._sensor_temperature()
+            if value is not None:
+                if self.temperature_source == TEMP_SOURCE_UNIT:
+                    _LOGGER.info("%s: %s is reporting again", self.name, self.sensor)
+                self.temperature_source = TEMP_SOURCE_SENSOR
+                return value
+        value = self._unit_temperature()
+        if value is None:
+            self.temperature_source = None
+            return None
+        if self.sensor and self.temperature_source != TEMP_SOURCE_UNIT:
+            _LOGGER.warning(
+                "%s: %s is unavailable or stale, using %s's own temperature",
+                self.name,
+                self.sensor,
+                self.climate,
+            )
+        self.temperature_source = TEMP_SOURCE_UNIT
+        return value
+
+    def _sensor_temperature(self) -> float | None:
+        """Return the configured sensor's reading, or None if unusable."""
+        state = self.hass.states.get(self.sensor) if self.sensor else None
+        if state is None or state.state in UNAVAILABLE:
+            return None
+        try:
+            value = float(state.state)
+        except ValueError:
+            return None
+        if self.max_age:
+            reported = getattr(state, "last_reported", None) or state.last_updated
+            newest = max(reported, state.last_updated)
+            if dt_util.utcnow() - newest > self.max_age:
                 return None
-            try:
-                value = float(state.state)
-            except ValueError:
-                return None
-            if self.max_age:
-                reported = getattr(state, "last_reported", None) or state.last_updated
-                newest = max(reported, state.last_updated)
-                if dt_util.utcnow() - newest > self.max_age:
-                    return None
-            return value
+        return value
+
+    def _unit_temperature(self) -> float | None:
+        """Return the climate entity's current temperature, or None."""
         climate = self.hass.states.get(self.climate)
         if climate is None:
             return None

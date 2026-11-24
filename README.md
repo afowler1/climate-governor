@@ -18,7 +18,7 @@ Requires Home Assistant 2025.3 or newer.
 
 **Rooms.** Use *Add room* on the integration. Each room has:
 
-- A climate entity, and optionally a temperature sensor (otherwise the unit's own reading is used) and a sleep timer that pauses control while active.
+- A climate entity, and optionally a temperature sensor (otherwise the unit's own reading is used; it is also used whenever the sensor is unavailable or older than the age limit) and a sleep timer that pauses control while active.
 - Allowed modes, fan mode, setpoint limits, minimum run and off times, and an optional sensor age limit.
 - An overnight profile and a solar profile.
 
@@ -47,7 +47,7 @@ Each room gets a device with:
 
 - `switch` Enabled: turn governing on or off for the room.
 - `number` Target: the target temperature.
-- `sensor` Status: `disabled`, `sleep`, `idle`, `heating`, `cooling` or `waiting`, with `reason`, `profile`, `last_error` and `export_w` attributes.
+- `sensor` Status: `disabled`, `sleep`, `idle`, `heating`, `cooling` or `waiting`, with `reason`, `profile`, `last_error`, `export_w` and `temperature_source` (`sensor` or `unit`) attributes.
 
 ## Development
 
